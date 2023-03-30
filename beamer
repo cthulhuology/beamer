@@ -1,0 +1,33 @@
+#!/usr/bin/env escript
+%% -*- erlang -*-
+%% -pa $HOME/.beamer -noshell -noinput
+%%
+%% Copyright 2023 David J Goehrig <dave@dloh.org>
+%%
+
+help() ->
+	io:format("beamer [help][make[repo]][compile file]~n").
+
+load_beamer() ->
+	{ok, [[ Path ]]} = init:get_argument(home),
+	Home = lists:flatten(string:replace(Path,"\\","/",all)),
+	code:add_patha(Home ++ "/.beamer"),
+	code:load_file(beamer).
+
+main(["compile",File]) ->
+	load_beamer(),
+	beamer:compile(File);
+
+main(["make", Repo ]) ->
+	load_beamer(),
+	beamer:make(Repo);
+
+main(["make"]) ->
+	load_beamer(),
+	beamer:make();
+
+main(["help"]) ->
+	help();
+
+main(_Args) ->
+	help().
