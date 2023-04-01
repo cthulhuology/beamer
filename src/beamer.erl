@@ -22,7 +22,7 @@
 -module(beamer).
 -author({ "David J Goehrig", "dave@dloh.org"}).
 -copyright(<<"© 2023 David J. Goehrig"/utf8>>).
--export([ load_all/0, load/1, compile/1, make/0, make/1 ]).
+-export([ load_all/0, load/1, compile/1, make/0, make/1, deps/0 ]).
 
 green(Term) ->
 	io:format([ 16#1b | "[;32m"]),
@@ -35,7 +35,7 @@ red(Term) ->
 	io:format([ 16#1b | "[;39m" ]).
 
 compile(Filename) ->
-	{ ok, Path } = init:get_argument(home),
+	{ ok, [[Path]] } = init:get_argument(home),
 	case compile:file(Filename, [ report,debug_info,{outdir, Path ++ "/.beamer"} ]) of
 		{ ok, Module } ->
 			io:format("Compiled module ~p ", [ Module ]),
@@ -53,7 +53,7 @@ compile(Filename) ->
 	end.
 
 load_all() ->
-	{ ok, Path } = init:get_argument(home),
+	{ ok, [[Path]] } = init:get_argument(home),
 	{ ok, Files } = file:list_dir(Path ++ "/.beamer"),
 	code:add_patha(Path ++ "/.beamer"),
 	Modules = [ list_to_atom(lists:nth(1,string:tokens(F,"."))) || F <- Files, lists:suffix(".beam",F)],	
@@ -61,15 +61,15 @@ load_all() ->
 	[ code:load_file(M) || M <- Modules, M =/= beamer ].
 
 load(Module) ->
-	{ ok, Path } = init:get_argument(home),
+	{ ok, [[Path]] } = init:get_argument(home),
+	code:add_patha(Path ++ "/.beamer"),
         code:purge(Module),
-	case code:load_abs( Path ++ "/.beamer/" ++ atom_to_list(Module) ++ ".beam") of
+	case code:ensure_loaded(Module) of
 		{ error, Error } ->
 			red(Error),
 			io:format("~n");
 		{ module, Module } ->
-			green(Module),
-			io:format("~n")
+			ok
 	end.
 	
 make(Path) ->
@@ -80,3 +80,21 @@ make() ->
 	{ ok, Files } = file:list_dir("src/"),
 	[ beamer:compile("src/" ++ F) || F <- Files, lists:suffix(".erl",F) ].
 
+
+git_clone_and_make(Repo,Path) when is_atom(Path) ->
+	git_clone_and_make(Repo,atom_to_list(Path));
+git_clone_and_make(Repo,Path) ->
+	case filelib:is_dir("../" ++ Path) of
+	true ->
+		io:format("Dep ~p exists~n", [ Repo ]);
+	_ ->
+		io:format("Cloning ~p to ../~p~n", [ Repo,Path ] ),
+		Command = "git clone " ++ Repo ++ "  ../" ++ Path,
+		os:cmd(Command)
+	end,
+	io:format("Build ~p~n", [ Path ]),
+	make("../" ++ Path).
+
+deps() ->
+	{ ok, Deps } = file:consult("deps"),
+	[ git_clone_and_make(Repo,Module) || { Module, Repo } <- Deps ].	

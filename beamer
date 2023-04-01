@@ -26,6 +26,10 @@ main(["make"]) ->
 	load_beamer(),
 	beamer:make();
 
+main(["deps"]) ->
+	load_beamer(),
+	beamer:deps();
+
 main(["help"]) ->
 	help();
 
